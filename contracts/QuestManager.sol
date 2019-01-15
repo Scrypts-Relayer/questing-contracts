@@ -27,33 +27,30 @@ contract QuestManager {
   uint questId = 0;
 
   struct Quest {
-    //address ipfs; // ipfs address for associated data
     uint id;
-    bool openForSubmission; //
+    bool openForSubmission; 
     address prizeTokenAddress;
     uint prizeTokenId;
-    address makerAddress;
-    string questName;
+    address questMaker;
+    //string questName;
     address[] requirementsList;
+    address ipfs; // ipfs address for associated data
   }
 
   mapping (uint => Quest) QUESTS; // all quests
   uint NUM_QUESTS = 0; // current total number of quests
 
   constructor() public {
-    //
-    // DON'T THINK WE NEED THIS
-    //
+    // nothing here yet 
   }
 
   function createQuest(
     address _prizeTokenAddress, 
     uint _prizeTokenId,  
     address[] memory _requirementsList,
-    string memory _questName
+    address _IPFSdata
     ) 
     public {
-
     //allow this contract to have transfer rights to prize token
     ERC721 nftInstance = ERC721(_prizeTokenAddress);
     nftInstance.safeTransferFrom(msg.sender, this, _prizeTokenId); 
@@ -64,18 +61,29 @@ contract QuestManager {
       openForSubmission : true,
       prizeTokenAddress : _prizeTokenAddress,
       prizeTokenId : _prizeTokenId,
-      makerAddres : msg.sender,
-      questName : _questName,
-      requirementsList : _requirementsList
+      questMaker : msg.sender,
+      requirementsList : _requirementsList,
+      ipfs : _IPFSdata
     });
 
     questId++; //increment the id counter
+    NUM_QUESTS ++; 
     QUESTS.push(newQuest.id, newQuest); //add to the global quest mapping
-        
+
   }
 
-  function completeQuest() public {
+  function toggleQuestOpen(bool _open, uint _questId) public{
+    
+    //check that the sender owns the quest 
+    require(QUESTS[_questId].questMaker == msg.sender);
 
+    //set the quest open state to the input parameter
+    QUESTS[_questId].openForSubmission = _open;
+
+  }
+
+  function completeQuest(uint _questId) public returns (bool completed){
+    
   }
 }
 
