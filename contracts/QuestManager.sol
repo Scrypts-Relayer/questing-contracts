@@ -213,7 +213,7 @@ contract QuestManager {
   }
 
 
-  function completeQuest(uint _questId, uint[] _submittedTokenIds) public returns (bool metRequirements, bool prizeWasThere){
+  function completeQuest(uint _questId, uint[] memory _submittedTokenIds) public returns (bool metRequirements, bool prizeWasThere){
     
     //check if the quest with that id exists
     require(questExists[_questId]); 
