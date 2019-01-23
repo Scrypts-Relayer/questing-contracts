@@ -1,0 +1,26 @@
+{
+  "name": "questing-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts that make up questing protocol inplementation.",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EthQuesting/questing-contracts.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/EthQuesting/questing-contracts/issues"
+  },
+  "homepage": "https://github.com/EthQuesting/questing-contracts#readme",
+  "dependencies": {
+    "openzeppelin-solidity": "^2.1.2",
+    "truffle-hdwallet-provider": "^1.0.0-web3one.5"
+  }
+}

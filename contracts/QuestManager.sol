@@ -14,58 +14,16 @@ pragma solidity >=0.4.21 <0.6.0;
   'transfer' rights 
 
  */
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
 
-/**
- * @title ERC20 interface
- * @dev see https://github.com/ethereum/EIPs/issues/20
- */
-contract ERC20 {
-  function transfer(address to, uint256 value) external returns (bool);
-  function approve(address spender, uint256 value) external returns (bool);
-  function transferFrom(address from, address to, uint256 value) external returns (bool);
-  function totalSupply() external view returns (uint256);
-  function balanceOf(address who) external view returns (uint256);
-  function allowance(address owner, address spender) external view returns (uint256);
-  event Transfer(address indexed from, address indexed to, uint256 value);
-  event Approval(address indexed owner, address indexed spender, uint256 value);
-}
-
-interface ERC165 {
-            /// @notice Query if a contract implements an interface
-            /// @param interfaceID The interface identifier, as specified in ERC-165
-            /// @dev Interface identification is specified in ERC-165. This function
-            ///  uses less than 30,000 gas.
-            /// @return `true` if the contract implements `interfaceID` and
-            ///  `interfaceID` is not 0xffffffff, `false` otherwise
-            function supportsInterface(bytes4 interfaceID) external view returns (bool);
-}
-
-contract ERC721 is ERC165{
-  event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
-  event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
-  event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
-
-  function balanceOf(address owner) public view returns (uint256 balance);
-  function ownerOf(uint256 tokenId) public view returns (address owner);
-
-  function approve(address to, uint256 tokenId) public;
-  function getApproved(uint256 tokenId) public view returns (address operator);
-
-  function setApprovalForAll(address operator, bool _approved) public;
-  function isApprovedForAll(address owner, address operator) public view returns (bool);
-
-  function transferFrom(address from, address to, uint256 tokenId) public;
-  function safeTransferFrom(address from, address to, uint256 tokenId) public;
-
-  function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) public;
-}
 contract QuestManager {
 
   event QuestCreated(uint indexed _questId, address indexed _creator);
   event QuestCompleted(uint indexed _questId, address indexed _completer);
   event toggleQuestOpem(uint indexed _questId, bool _open);
 
-  uint questId = 0;
+  uint public questId = 0;
 
   struct Quest {
     uint id;
@@ -80,38 +38,35 @@ contract QuestManager {
     bool open;// is the quest open for submissions
   }
 
-  mapping (uint => Quest) QUESTS; // all quests
+  mapping  (uint => Quest) public QUESTS; // all quests
   mapping (uint => bool) questExists; //store boolen for existing quests
   
   constructor() public {
     // nothing here yet 
   }
 
-  function createQuest(
+  function createQuest (
     address _prizeTokenAddress, 
     uint _prizeTokenId,  
     uint _prizeTokenAmount, 
     bool _prizeIsNFT,
     address[] memory _requirementsList,
     address _IPFSdata
-    ) 
-    public returns (bool succesfullyCreated){
+    )  
+    public returns(uint){
+    
+    require(_prizeTokenAmount > 0, "prize amount must be greater than 0");
    
     //if an NFT, check that its valid
     if (_prizeIsNFT) {
       ERC721 nft = ERC721(_prizeTokenAddress);
-
       //use the 165 function to check it supports the ERC721 interface
-      require(nft.supportsInterface(0x80ac58cd));
-
+      nft;
       //check that the quest maker owns the NFT
-      require(nft.ownerOf(_prizeTokenId) == msg.sender);
-
-
+      require(nft.ownerOf(_prizeTokenId) == msg.sender, "error over here");
+    
     } else {
-
       //check if the ERC20 prize is a valid token 
-
       //check that they have a high enough balance
     }
 
@@ -133,12 +88,14 @@ contract QuestManager {
     QUESTS[newQuest.id] = newQuest; //add to the global quest mapping
     questExists[newQuest.id] = true;
 
+    emit QuestCreated(newQuest.id, newQuest.questMaker);
   }
+
 
   //need to get data for UIs
   //refercing the way crypto kitties does this 
   //https://etherscan.io/address/0x06012c8cf97bead5deae237070f9587f8e7a266d#code
-  function getQuest(uint _questId) public returns (
+  function getQuest(uint _questId) public view returns (
     uint id,
     bool openForSubmission, 
     address prizeTokenAddress,
@@ -187,7 +144,8 @@ contract QuestManager {
       //check that this NFT is owned by us 
       require(prizeToken.ownerOf(currentQuest.prizeTokenId) == address(this));
 
-      return true;
+      open = true;
+      return open;
     }
     //else, the prize is an ERC20 and we have enough tokens given to us by quest maker
     else {
@@ -208,12 +166,11 @@ contract QuestManager {
     return false;
   }
 
-  function cancelOrder(uint _questId) public{
-    //code to transfer ownership back to the maker
-  }
+  // function cancelOrder(uint _questId) public{
+  //   //code to transfer ownership back to the maker
+  // }
 
-
-  function completeQuest(uint _questId, uint[] memory _submittedTokenIds) public returns (bool metRequirements, bool prizeWasThere){
+  function completeQuest(uint _questId, uint[] memory _submittedTokenIds) public {
     
     //check if the quest with that id exists
     require(questExists[_questId]); 
