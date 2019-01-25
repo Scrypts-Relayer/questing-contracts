@@ -36,11 +36,10 @@ contract QuestManager {
     address questMaker;
     address[] requirementsList;
     address ipfs; // ipfs address for associated data
-    bool open;// is the quest open for submissions
   }
 
   mapping  (uint => Quest) public QUESTS; // all quests
-  mapping (uint => bool) questExists; //store boolen for existing quests
+  mapping (uint => bool) questExists; //keep track of open/non-canceled quests
 
   constructor() public {}
 
@@ -90,8 +89,7 @@ contract QuestManager {
       prizeIsNFT : _prizeIsNFT,
       questMaker : msg.sender,
       requirementsList : _requirementsList,
-      ipfs : _IPFSdata,
-      open : true
+      ipfs : _IPFSdata
     });
 
     questId++; //increment the id counter
@@ -120,29 +118,27 @@ contract QuestManager {
       prizeToken.transfer(currentQuest.questMaker, currentQuest.prizeTokenAmount);
     }
     questExists[currentQuest.id] = false;
-    QUESTS[currentQuest.id].open = false;
-
   }
 
   function completeQuest(uint _questId, uint[] memory _submittedTokenIds) public {
     
     //check if the quest with that id exists
-    require(questExists[_questId]); 
+    require(questExists[_questId], "Quest does not exist"); 
 
     Quest memory quest = QUESTS[_questId];
     
     //now check they have submitted transfer rights of all requirements to us
-    for (uint i=0; i<quest.requirementsList.length; i++) {
+    for (uint i = 0; i<quest.requirementsList.length; i++) {
 
       //get the NFT that is required
       address requiredTokenAddress = quest.requirementsList[i];
       ERC721 requiredToken = ERC721(requiredTokenAddress);
 
       //check that the submitter actual owns the NFT they are trying to submit
-      require(requiredToken.ownerOf(_submittedTokenIds[i]) == msg.sender);
+      require(requiredToken.ownerOf(_submittedTokenIds[i]) == msg.sender, "submitter doesn't own requirement");
 
       //check that the user has given transfer rights to us
-      require(requiredToken.getApproved(_submittedTokenIds[i]) == address(this));
+      require(requiredToken.getApproved(_submittedTokenIds[i]) == address(this), "user has not given us transfer rights");
 
     }
 
@@ -163,7 +159,7 @@ contract QuestManager {
     }
 
     //now swap submitted tokens to maker
-    for (uint i=0; i<quest.requirementsList.length; i++) {
+    for (uint i = 0; i<quest.requirementsList.length; i++) {
 
       //get the NFT that is required
       address requiredTokenAddress = quest.requirementsList[i];
@@ -173,10 +169,7 @@ contract QuestManager {
       requiredToken.safeTransferFrom(msg.sender, quest.questMaker, _submittedTokenIds[i]);
     }
 
-    //now close the quest and remove it from set of existing quests
-    QUESTS[quest.id].open = false;
     questExists[quest.id] = false;
-
   }
 
 
