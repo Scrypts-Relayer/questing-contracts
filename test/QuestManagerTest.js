@@ -47,7 +47,7 @@ contract("QuestManager", accounts => {
     let res1 = await instance.createQuest(nftAddress, prizeid, 1, true, rList, nftAddress, {from : a1});
 
     try {
-      await instance.cancelQuest(0, {from : a2});
+      await instance.cancelQuest(1, {from : a2});
     } catch(error){
       assert.include(error.message,'cant cancel quest if not owner');
     }

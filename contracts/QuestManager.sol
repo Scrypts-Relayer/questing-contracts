@@ -115,13 +115,12 @@ contract QuestManager {
       //give nft back to creator 
       ERC721 prizeToken = ERC721(currentQuest.prizeTokenAddress);
       prizeToken.transferFrom(address(this), currentQuest.questMaker, currentQuest.prizeTokenId);
-      questExists[currentQuest.id] = false;
-      QUESTS[currentQuest.id].open = false;
     } else {
       ERC20 prizeToken = ERC20(currentQuest.prizeTokenAddress);
-      
-
+      prizeToken.transfer(currentQuest.questMaker, currentQuest.prizeTokenAmount);
     }
+    questExists[currentQuest.id] = false;
+    QUESTS[currentQuest.id].open = false;
 
   }
 
@@ -129,9 +128,6 @@ contract QuestManager {
     
     //check if the quest with that id exists
     require(questExists[_questId]); 
-
-    //check that quest is open for submissions
-    require(QUESTS[_questId].open); 
 
     Quest memory quest = QUESTS[_questId];
     
