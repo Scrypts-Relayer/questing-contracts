@@ -24,6 +24,7 @@ contract QuestManager {
   event toggleQuestOpem(uint indexed _questId, bool _open);
 
   uint public questId = 0;
+  uint256[] public ids;
 
   struct Quest {
     uint id;
@@ -40,10 +41,8 @@ contract QuestManager {
 
   mapping  (uint => Quest) public QUESTS; // all quests
   mapping (uint => bool) questExists; //store boolen for existing quests
-  
-  constructor() public {
-    // nothing here yet 
-  }
+
+  constructor() public {}
 
   function createQuest (
     address _prizeTokenAddress, 
@@ -57,17 +56,28 @@ contract QuestManager {
     
     require(_prizeTokenAmount > 0, "prize amount must be greater than 0");
    
-    //if an NFT, check that its valid
     if (_prizeIsNFT) {
-      ERC721 nft = ERC721(_prizeTokenAddress);
-      //use the 165 function to check it supports the ERC721 interface
-      nft;
+      ERC721 prizeToken = ERC721(_prizeTokenAddress);
       //check that the quest maker owns the NFT
-      require(nft.ownerOf(_prizeTokenId) == msg.sender, "error over here");
+      require(prizeToken.ownerOf(_prizeTokenId) == msg.sender, "quest creator does not own prize");
+      require(prizeToken.getApproved(_prizeTokenId) == address(this), "creator has not given access to prize");
+      
+      //now transfer ownership to this contract 
+      prizeToken.transferFrom(msg.sender, address(this), _prizeTokenId);
     
     } else {
-      //check if the ERC20 prize is a valid token 
       //check that they have a high enough balance
+      ERC20 prizeToken = ERC20(_prizeTokenAddress);
+      require(prizeToken.balanceOf(msg.sender) >= _prizeTokenAmount, "quest creator does not own enough of prize token");
+
+      //get the balance for our contract 
+      uint256 allowance = prizeToken.allowance(msg.sender, address(this));
+      
+      require(allowance >= _prizeTokenAmount, "creator has not allowed us enough tokens");
+
+      //give this contract the tokens
+      prizeToken.transfer(address(this), _prizeTokenAmount);
+      
     }
 
     //create the new quest
@@ -88,87 +98,32 @@ contract QuestManager {
     QUESTS[newQuest.id] = newQuest; //add to the global quest mapping
     questExists[newQuest.id] = true;
 
+    ids.push(questId);
+
     emit QuestCreated(newQuest.id, newQuest.questMaker);
   }
 
+  function cancelQuest(uint _questId) public{
 
-  //need to get data for UIs
-  //refercing the way crypto kitties does this 
-  //https://etherscan.io/address/0x06012c8cf97bead5deae237070f9587f8e7a266d#code
-  function getQuest(uint _questId) public view returns (
-    uint id,
-    bool openForSubmission, 
-    address prizeTokenAddress,
-    uint prizeTokenId,
-    uint prizeTokenAmount,
-    bool prizeIsNFT,
-    address questMaker,
-    address[] memory requirementsList,
-    address ipfs// ipfs address for associated data
-  ) {
+    require(questExists[_questId], "quest is cancled or doesn't exist"); //check if the quest with that id exists
+    
+    Quest memory currentQuest = QUESTS[_questId]; 
 
-    //check that the quest exists
-    require(questExists[_questId]);
+    require(currentQuest.questMaker == msg.sender, "cant cancel quest if not owner");
 
-    Quest memory quest = QUESTS[_questId];
-
-    //check that the quest isnt over 
-    require(quest.open);
-
-    id = quest.id;
-    openForSubmission = quest.openForSubmission;
-    prizeTokenAddress = quest.prizeTokenAddress;
-    prizeTokenId = quest.prizeTokenId;
-    prizeTokenAmount = quest.prizeTokenAmount;
-    prizeIsNFT = quest.prizeIsNFT;
-    questMaker = quest.questMaker;
-    requirementsList = quest.requirementsList;
-    ipfs = quest.ipfs;
-  }
-
-  //we need a separate function to call to check if the 'maker'
-  //has locked up the prize after quest creation
-  //locked implies this contract has ownership over funds
-  function checkPrizeLockup(uint _questId) internal returns (bool open) {
-
-    //check that we have a quest with this id
-    require(questExists[_questId]);
-
-    //get the current quest
-    Quest memory currentQuest = QUESTS[_questId];
-
-    //if prize is an NFT, check that we have ownership of prize
-    if (currentQuest.prizeIsNFT){
+    if(currentQuest.prizeIsNFT){
+      //give nft back to creator 
       ERC721 prizeToken = ERC721(currentQuest.prizeTokenAddress);
-
-      //check that this NFT is owned by us 
-      require(prizeToken.ownerOf(currentQuest.prizeTokenId) == address(this));
-
-      open = true;
-      return open;
-    }
-    //else, the prize is an ERC20 and we have enough tokens given to us by quest maker
-    else {
-
+      prizeToken.transferFrom(address(this), currentQuest.questMaker, currentQuest.prizeTokenId);
+      questExists[currentQuest.id] = false;
+      QUESTS[currentQuest.id].open = false;
+    } else {
       ERC20 prizeToken = ERC20(currentQuest.prizeTokenAddress);
+      
 
-      //get the balance for our contract 
-      uint256 allowance = prizeToken.allowance(currentQuest.questMaker ,address(this));
-
-      //check that this allowance is at least the amount for the prize 
-      require(allowance >= currentQuest.prizeTokenAmount);
-
-      //require that the quest creator owns enough tokens 
-      require(prizeToken.balanceOf(currentQuest.questMaker) >= currentQuest.prizeTokenAmount);
-
-      return true;
     }
-    return false;
-  }
 
-  // function cancelOrder(uint _questId) public{
-  //   //code to transfer ownership back to the maker
-  // }
+  }
 
   function completeQuest(uint _questId, uint[] memory _submittedTokenIds) public {
     
@@ -177,9 +132,6 @@ contract QuestManager {
 
     //check that quest is open for submissions
     require(QUESTS[_questId].open); 
-
-    //only let users complete quests if our contract has access to the prize
-    require (checkPrizeLockup(_questId));
 
     Quest memory quest = QUESTS[_questId];
     
