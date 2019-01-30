@@ -27,15 +27,13 @@ contract QuestManager {
   uint256[] public ids;
 
   struct Quest {
-    uint id;
-    bool openForSubmission; 
-    address prizeTokenAddress;
-    uint prizeTokenId;
-    uint prizeTokenAmount; 
-    bool prizeIsNFT;
-    address questMaker;
-    address[] requirementsList;
-    address ipfs; // ipfs address for associated data
+    uint id; //unique id for quest 
+    address prizeTokenAddress; //address for the prize token
+    uint prizeTokenId; // id if prize is ERC721
+    uint prizeTokenAmount; // amount of prize tokens if prize is ERC20
+    bool prizeIsNFT; // label the type of prize
+    address creator; // creator of the quest 
+    address[] requirementsList; // list of token to acquire to complete quest
   }
 
   mapping  (uint => Quest) public QUESTS; // all quests
@@ -43,89 +41,108 @@ contract QuestManager {
 
   constructor() public {}
 
+
+  function getId() public view returns(uint){
+    return questId;
+  }
+
   function createQuest (
     address _prizeTokenAddress, 
     uint _prizeTokenId,  
     uint _prizeTokenAmount, 
     bool _prizeIsNFT,
-    address[] memory _requirementsList,
-    address _IPFSdata
+    address[] memory _requirementsList
     )  
     public returns(uint){
-    
-    require(_prizeTokenAmount > 0, "prize amount must be greater than 0");
-   
+       
     if (_prizeIsNFT) {
+
+      //check that the amount is 1 (no support for multiple nft prizes)
+      require(_prizeTokenAmount == 1, "prize amount for NFT must be 1");
+
       ERC721 prizeToken = ERC721(_prizeTokenAddress);
-      //check that the quest maker owns the NFT
+
+      //check that the quest maker owns the NFT and has given us access 
       require(prizeToken.ownerOf(_prizeTokenId) == msg.sender, "quest creator does not own prize");
       require(prizeToken.getApproved(_prizeTokenId) == address(this), "creator has not given access to prize");
       
-      //now transfer ownership to this contract 
+      // transfer prize to escrow 
       prizeToken.transferFrom(msg.sender, address(this), _prizeTokenId);
     
     } else {
+
+      //check that the prize amount is valid
+      require(_prizeTokenAmount > 0, "prize amount must be greater than 0");
+
       //check that they have a high enough balance
       ERC20 prizeToken = ERC20(_prizeTokenAddress);
       require(prizeToken.balanceOf(msg.sender) >= _prizeTokenAmount, "quest creator does not own enough of prize token");
 
-      //get the balance for our contract 
+      //get the allowance for our contract and make sure its high enough 
       uint256 allowance = prizeToken.allowance(msg.sender, address(this));
-      
       require(allowance >= _prizeTokenAmount, "creator has not allowed us enough tokens");
 
-      //give this contract the tokens
-      prizeToken.transfer(address(this), _prizeTokenAmount);
+      // transfer prize to escrow
+      prizeToken.transferFrom(msg.sender, address(this), _prizeTokenAmount);
       
     }
+
+    questId++; 
 
     //create the new quest
     Quest memory newQuest = Quest({
       id : questId,
-      openForSubmission : true,
       prizeTokenAddress : _prizeTokenAddress,
       prizeTokenId : _prizeTokenId,
       prizeTokenAmount : _prizeTokenAmount,
       prizeIsNFT : _prizeIsNFT,
-      questMaker : msg.sender,
-      requirementsList : _requirementsList,
-      ipfs : _IPFSdata
+      creator : msg.sender,
+      requirementsList : _requirementsList
     });
 
-    questId++; //increment the id counter
-    QUESTS[newQuest.id] = newQuest; //add to the global quest mapping
-    questExists[newQuest.id] = true;
+    QUESTS[newQuest.id] = newQuest; // add to the global quest mapping
+    questExists[newQuest.id] = true; // mark that this quest is open
+    ids.push(newQuest.id); // add to global list of ids
 
-    ids.push(questId);
-
-    emit QuestCreated(newQuest.id, newQuest.questMaker);
+    emit QuestCreated(newQuest.id, newQuest.creator);
   }
 
+  /**
+    Creator have the otpion to cancel a quest and regain ownership 
+    of the prize that is held in escrow. 
+   */
   function cancelQuest(uint _questId) public{
-
-    require(questExists[_questId], "quest is cancled or doesn't exist"); //check if the quest with that id exists
+    
+    //check that the quest is open 
+    require(questExists[_questId], "quest is cancled or doesn't exist"); 
     
     Quest memory currentQuest = QUESTS[_questId]; 
+    require(currentQuest.creator == msg.sender, "cant cancel quest if not owner");
 
-    require(currentQuest.questMaker == msg.sender, "cant cancel quest if not owner");
 
     if(currentQuest.prizeIsNFT){
-      //give nft back to creator 
+      //give token back to creator 
       ERC721 prizeToken = ERC721(currentQuest.prizeTokenAddress);
-      prizeToken.transferFrom(address(this), currentQuest.questMaker, currentQuest.prizeTokenId);
+      prizeToken.transferFrom(address(this), currentQuest.creator, currentQuest.prizeTokenId);
     } else {
+      //give tokens back to owner
       ERC20 prizeToken = ERC20(currentQuest.prizeTokenAddress);
-      prizeToken.transfer(currentQuest.questMaker, currentQuest.prizeTokenAmount);
+      prizeToken.transfer(currentQuest.creator, currentQuest.prizeTokenAmount);
     }
+
+    //mark the quest as closed
     questExists[currentQuest.id] = false;
   }
 
   function completeQuest(uint _questId, uint[] memory _submittedTokenIds) public {
     
-    //check if the quest with that id exists
-    require(questExists[_questId], "Quest does not exist"); 
+    //check that the quest is open 
+    require(questExists[_questId], "quest does no exist");
 
     Quest memory quest = QUESTS[_questId];
+
+    //check that the length of submitted tokens is correct 
+    require(_submittedTokenIds.length == quest.requirementsList.length, "amount of submitted tokens does not match lenght of requirmenets");
     
     //now check they have submitted transfer rights of all requirements to us
     for (uint i = 0; i<quest.requirementsList.length; i++) {
@@ -149,7 +166,9 @@ contract QuestManager {
       ERC721 prizeToken = ERC721(quest.prizeTokenAddress);
 
       //give the prize NFT to the submitter
-      prizeToken.safeTransferFrom(address(this), msg.sender, quest.prizeTokenId);
+      prizeToken.transferFrom(address(this), msg.sender, quest.prizeTokenId);
+
+      require(prizeToken.ownerOf(quest.prizeTokenId) == msg.sender, "Prize not transfered");
     }
     else {
       ERC20 prizeToken = ERC20(quest.prizeTokenAddress);
@@ -166,7 +185,7 @@ contract QuestManager {
       ERC721 requiredToken = ERC721(requiredTokenAddress);
 
       //give new ownership to the maker
-      requiredToken.safeTransferFrom(msg.sender, quest.questMaker, _submittedTokenIds[i]);
+      requiredToken.safeTransferFrom(msg.sender, quest.creator, _submittedTokenIds[i]);
     }
 
     questExists[quest.id] = false;
