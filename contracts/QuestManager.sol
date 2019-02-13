@@ -134,6 +134,12 @@ contract QuestManager {
     questExists[currentQuest.id] = false;
   }
 
+  function checkRequiremnetLockup(address _tokenAddress) public returns (uint) {
+    ERC721 req = ERC721(_tokenAddress);
+    uint balance = req.balanceOf(msg.sender);
+    return balance;
+  }
+
   function completeQuest(uint _questId, uint[] memory _submittedTokenIds) public {
     
     //check that the quest is open 
@@ -176,6 +182,7 @@ contract QuestManager {
       //give the amount of tokens to the submitter
       prizeToken.transfer(msg.sender, quest.prizeTokenAmount);
     }
+    
 
     //now swap submitted tokens to maker
     for (uint i = 0; i<quest.requirementsList.length; i++) {
