@@ -37,13 +37,21 @@ contract QuestManager {
   }
 
   mapping  (uint => Quest) public QUESTS; // all quests
-  mapping (uint => bool) questExists; //keep track of open/non-canceled quests
+  mapping (uint => bool) public questExists; //keep track of open/non-canceled quests
 
   constructor() public {}
 
 
   function getId() public view returns(uint){
     return questId;
+  }
+
+  function getQuestsReqLength(uint256 id) public view returns(uint256){
+    return QUESTS[id].requirementsList.length;
+  }
+
+  function getReqAddress(uint id, uint index) public view returns (address){
+    return QUESTS[id].requirementsList[index];
   }
 
   function createQuest (
@@ -64,10 +72,10 @@ contract QuestManager {
 
       //check that the quest maker owns the NFT and has given us access 
       require(prizeToken.ownerOf(_prizeTokenId) == msg.sender, "quest creator does not own prize");
-      require(prizeToken.getApproved(_prizeTokenId) == address(this), "creator has not given access to prize");
+      //require(prizeToken.getApproved(_prizeTokenId) == address(this), "creator has not given access to prize");
       
       // transfer prize to escrow 
-      prizeToken.transferFrom(msg.sender, address(this), _prizeTokenId);
+      //prizeToken.transferFrom(msg.sender, address(this), _prizeTokenId);
     
     } else {
 
@@ -80,10 +88,10 @@ contract QuestManager {
 
       //get the allowance for our contract and make sure its high enough 
       uint256 allowance = prizeToken.allowance(msg.sender, address(this));
-      require(allowance >= _prizeTokenAmount, "creator has not allowed us enough tokens");
+      //require(allowance >= _prizeTokenAmount, "creator has not allowed us enough tokens");
 
       // transfer prize to escrow
-      prizeToken.transferFrom(msg.sender, address(this), _prizeTokenAmount);
+      //prizeToken.transferFrom(msg.sender, address(this), _prizeTokenAmount);
       
     }
 
@@ -118,7 +126,6 @@ contract QuestManager {
     
     Quest memory currentQuest = QUESTS[_questId]; 
     require(currentQuest.creator == msg.sender, "cant cancel quest if not owner");
-
 
     if(currentQuest.prizeIsNFT){
       //give token back to creator 
