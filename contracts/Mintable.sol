@@ -14,7 +14,7 @@ contract Mintable is ERC721, MinterRole {
      * @param tokenId The token id to mint.
      * @return A boolean that indicates if the operation was successful.
      */
-  function mint(address to, uint256 tokenId) public onlyMinter returns (bool) {
+  function mint(address to, uint256 tokenId) public returns (bool) {
     _mint(to, tokenId);
     return true;
   }
