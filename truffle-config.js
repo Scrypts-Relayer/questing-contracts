@@ -76,8 +76,7 @@ module.exports = {
       provider: () => new HDWalletProvider(mnemonic, `https://rinkeby.infura.io/v3/5e9c1165816d461cb7eb9923c710a26a`),
       network_id: 4,
       gas: 6700000, // Gas limit used for deploys
-      skipDryRun: true,
-      confirmations : 7
+      skipDryRun: true
     }
 
     // Useful for private networks
